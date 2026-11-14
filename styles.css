@@ -102,7 +102,13 @@ textarea {
 
 .resume-header:has(> .resume-photo) > .resume-photo {
   grid-column: 2;
-  grid-row: 1 / span 4;
+}
+
+/* 标题区可以有多行，每一行都能单独设置对齐 */
+.resume-header-text {
+  display: grid;
+  row-gap: 1px;
+  min-width: 0;
 }
 
 .resume-header h1 {
@@ -115,6 +121,19 @@ textarea {
 .resume-header p {
   margin: 0;
   font-size: var(--base-font-size);
+}
+
+/* 行级对齐：行尾写 {center} / {left} / {right}（也支持中文别名） */
+.resume-page .is-align-center {
+  text-align: center;
+}
+
+.resume-page .is-align-left {
+  text-align: left;
+}
+
+.resume-page .is-align-right {
+  text-align: right;
 }
 
 .section {
@@ -388,6 +407,41 @@ textarea {
 .image-item.is-active {
   border-color: #1677c8;
   box-shadow: 0 0 0 2px rgba(22, 119, 200, 0.25);
+}
+
+.header-line-list {
+  display: grid;
+  gap: 6px;
+}
+
+.header-line-list[hidden] {
+  display: none;
+}
+
+.header-line-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-line-text {
+  overflow: hidden;
+  color: #263241;
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-section .header-line-row select {
+  width: 100%;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid #cfd6e0;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
 }
 
 .panel-section select {

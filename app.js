@@ -29,6 +29,8 @@ let isWritingMarkdown = false;
 let currentPhoto = "";
 let imageLibrary = {};
 let selectedImageId = null;
+// 上一次渲染出的标题区行（姓名行 + 标题区每一行），供右侧对齐面板逐行控制
+let headerLines = [];
 
 const els = {
   preview: document.querySelector("#resumePreview"),
@@ -50,6 +52,8 @@ const els = {
   photoStatus: document.querySelector("#photoStatus"),
   choosePhotoBtn: document.querySelector("#choosePhotoBtn"),
   removePhotoBtn: document.querySelector("#removePhotoBtn"),
+  headerLineList: document.querySelector("#headerLineList"),
+  headerAlignHint: document.querySelector("#headerAlignHint"),
   addImageBtn: document.querySelector("#addImageBtn"),
   imageFile: document.querySelector("#imageFile"),
   imageList: document.querySelector("#imageList"),
@@ -205,6 +209,46 @@ function splitTrailingDate(text) {
   };
 }
 
+/* ---------------- 行级对齐：行尾写 {center} / {left} / {right} ---------------- */
+
+const ALIGN_ALIASES = {
+  center: "center",
+  c: "center",
+  "居中": "center",
+  "中": "center",
+  left: "left",
+  l: "left",
+  "靠左": "left",
+  "左": "left",
+  right: "right",
+  r: "right",
+  "靠右": "right",
+  "右": "right",
+};
+
+const ALIGN_LABELS = { center: "居中", left: "靠左", right: "靠右" };
+
+// 只认行尾的 {…}，且内容必须是已知的对齐别名，避免误吃正文里的花括号
+const ALIGN_MARKER_PATTERN = /\s*\{\s*([^{}\s]{1,8})\s*\}\s*$/;
+
+// 拆出行尾对齐标记，返回去掉标记后的文本和对齐方式
+function splitAlignMarker(rawLine) {
+  const match = ALIGN_MARKER_PATTERN.exec(rawLine);
+  const align = match ? ALIGN_ALIASES[match[1].toLowerCase()] : "";
+
+  if (!align) {
+    return { text: rawLine, align: "" };
+  }
+
+  return { text: rawLine.slice(0, match.index), align };
+}
+
+// 生成 class 属性；没有对齐标记时返回空串，不污染输出
+function alignAttribute(align, baseClass = "") {
+  const classes = [baseClass, align ? `is-align-${align}` : ""].filter(Boolean);
+  return classes.length ? ` class="${classes.join(" ")}"` : "";
+}
+
 function isStrongOnlyLine(line) {
   return /^\*\*.+\*\*$/.test(line.trim());
 }
@@ -214,14 +258,21 @@ function isImageOnlyLine(line) {
   return /^!\[[^\]]*\]\(.+\)$/.test(line.trim());
 }
 
-// 关闭姓名区；姓名区里攒下的图片行统一补在 </header> 之后，避免图片挤进姓名块
+// 关闭标题区；标题区里攒下的图片行统一补在 </header> 之后，避免图片挤进姓名块
 function closeHeader(state, html) {
   if (state.headerComplete) {
     return;
   }
 
   state.headerComplete = true;
-  html.push("</header>");
+
+  // 没有一级标题时不存在标题区，直接返回，避免输出孤立的闭合标签
+  if (!state.headerOpen) {
+    return;
+  }
+
+  state.headerOpen = false;
+  html.push("</div>", "</header>");
 
   if (state.deferred.length) {
     html.push(...state.deferred);
@@ -246,7 +297,15 @@ function closeList(state, html) {
   state.listType = null;
 }
 
-function renderBodyLine(line) {
+function renderBodyLine(rawLine) {
+  const parsed = splitAlignMarker(rawLine);
+  const line = parsed.text.trim();
+
+  if (!line) {
+    return "";
+  }
+
+  // 带日期的行有自己的「日期靠右」布局，不再套行级对齐
   const dated = renderDatedLine(line);
   if (dated) {
     return dated;
@@ -255,20 +314,28 @@ function renderBodyLine(line) {
   if (isStrongOnlyLine(line)) {
     const label = stripOuterBold(line);
     if (/^(项目描述|主要工作|项目职责|技术栈|项目亮点|成果)[:：]?$/.test(label)) {
-      return `<h4>${renderInline(label)}</h4>`;
+      return `<h4${alignAttribute(parsed.align)}>${renderInline(label)}</h4>`;
     }
-    return `<h3>${renderInline(label)}</h3>`;
+    return `<h3${alignAttribute(parsed.align)}>${renderInline(label)}</h3>`;
   }
 
-  return `<p>${renderInline(line)}</p>`;
+  return `<p${alignAttribute(parsed.align)}>${renderInline(line)}</p>`;
 }
 
 function renderMarkdown(markdown) {
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
   const html = [];
-  const state = { listType: null, inSection: false, headerComplete: false, headerOpen: false, deferred: [] };
+  const state = {
+    listType: null,
+    inSection: false,
+    headerComplete: false,
+    headerOpen: false,
+    deferred: [],
+    headerLines: [],
+  };
 
-  for (const rawLine of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawLine = lines[index];
     const line = rawLine.trim();
 
     if (!line) {
@@ -278,13 +345,27 @@ function renderMarkdown(markdown) {
 
     if (line.startsWith("# ")) {
       closeList(state, html);
+      closeHeader(state, html);
       if (state.inSection) {
         html.push("</section>");
         state.inSection = false;
       }
-      html.push(`<header class="resume-header"><h1>${renderInline(line.slice(2).trim())}</h1>`);
+
+      const title = splitAlignMarker(line.slice(2));
+      const titleText = title.text.trim();
+      // 姓名和标题区的每一行放在同一个文本块里，这样带证件照时照片始终相对整块垂直居中
+      html.push(
+        `<header class="resume-header"><div class="resume-header-text"><h1${alignAttribute(title.align, "resume-name")}>${renderInline(titleText)}</h1>`,
+      );
       state.headerComplete = false;
       state.headerOpen = true;
+      state.headerLines.push({
+        lineIndex: index,
+        order: state.headerLines.length,
+        isName: true,
+        text: titleText,
+        align: title.align || "center",
+      });
       continue;
     }
 
@@ -301,20 +382,35 @@ function renderMarkdown(markdown) {
 
     if (line === "---") {
       closeList(state, html);
+      closeHeader(state, html);
       html.push('<hr class="project-separator" />');
       continue;
     }
 
-    // 姓名和联系方式之间的图片行先记下来，等姓名区关闭后补到正文里
-    if (state.headerOpen && !state.headerComplete && !state.inSection && isImageOnlyLine(line)) {
-      state.deferred.push(`<p>${renderInline(line)}</p>`);
-      continue;
-    }
+    // 姓名行到第一个分区之间的每一行都属于标题区，逐行决定对齐方式
+    if (state.headerOpen && !state.headerComplete) {
+      // 图片行先记下来，等标题区关闭后补到正文里
+      if (isImageOnlyLine(line)) {
+        state.deferred.push(`<p>${renderInline(line)}</p>`);
+        continue;
+      }
 
-    if (!state.headerComplete && !state.inSection) {
-      html.push(`<p>${renderInline(line)}</p>`);
+      // 列表不算标题区内容，遇到就结束标题区
+      if (!/^(?:\d+\.|[-*])\s+/.test(line)) {
+        const parsed = splitAlignMarker(line);
+        const text = parsed.text.trim();
+        state.headerLines.push({
+          lineIndex: index,
+          order: state.headerLines.length,
+          isName: false,
+          text,
+          align: parsed.align || "center",
+        });
+        html.push(`<p class="resume-header-line${parsed.align ? ` is-align-${parsed.align}` : ""}">${renderInline(text)}</p>`);
+        continue;
+      }
+
       closeHeader(state, html);
-      continue;
     }
 
     const ordered = line.match(/^\d+\.\s+(.+)$/);
@@ -340,7 +436,77 @@ function renderMarkdown(markdown) {
     html.push("</section>");
   }
 
+  headerLines = state.headerLines;
   return html.join("");
+}
+
+/* ---------------- 标题区逐行对齐面板 ---------------- */
+
+function headerLineLabel(text) {
+  return text.replace(/\*\*/g, "").replace(/`/g, "").trim();
+}
+
+// 把某一行的对齐方式写回 Markdown（居中默认不写标记，保持文件干净）
+function setHeaderLineAlign(entry, align) {
+  const lines = els.markdown.value.replace(/\r\n/g, "\n").split("\n");
+  const current = lines[entry.lineIndex];
+
+  if (typeof current !== "string") {
+    renderHeaderAlignControls();
+    return;
+  }
+
+  const base = splitAlignMarker(current).text.trim().replace(/^#\s+/, "");
+  const marker = align && align !== "center" ? ` {${align}}` : "";
+  lines[entry.lineIndex] = entry.isName ? `# ${base}${marker}` : `${base}${marker}`;
+  els.markdown.value = lines.join("\n");
+
+  renderAndPersist();
+  setStatus(`标题区「${headerLineLabel(entry.text) || "姓名"}」已设为${ALIGN_LABELS[align] || "居中"}。`);
+
+  // 重新渲染后把焦点放回刚操作的那一行，方便连续调整
+  els.headerLineList?.children[entry.order]?.querySelector("select")?.focus();
+}
+
+function renderHeaderAlignControls() {
+  const list = els.headerLineList;
+  if (!list) {
+    return;
+  }
+
+  list.replaceChildren();
+  const entries = headerLines;
+  list.hidden = entries.length === 0;
+
+  if (els.headerAlignHint) {
+    els.headerAlignHint.textContent = entries.length
+      ? "姓名下面写的每一行都可以单独选择对齐方式，改动会自动写回 Markdown。"
+      : "在「# 姓名」下面写几行（联系方式、求职意向等），就能逐行选择居中、靠左或靠右。";
+  }
+
+  entries.forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "header-line-row";
+
+    const label = document.createElement("span");
+    label.className = "header-line-text";
+    label.textContent = headerLineLabel(entry.text) || "（空行）";
+    label.title = label.textContent;
+
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", `${label.textContent} 的对齐方式`);
+    ["center", "left", "right"].forEach((value) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = ALIGN_LABELS[value];
+      select.appendChild(option);
+    });
+    select.value = entry.align || "center";
+    select.addEventListener("change", () => setHeaderLineAlign(entry, select.value));
+
+    row.append(label, select);
+    list.appendChild(row);
+  });
 }
 
 function normalTextColor(depth) {
@@ -1021,6 +1187,7 @@ function renderPreview() {
   els.preview.innerHTML = `<div class="resume-content">${renderMarkdown(els.markdown.value)}</div>`;
   renderPhoto();
   updatePhotoStatus();
+  renderHeaderAlignControls();
   fitToOnePage();
   settleAllImages();
   document.fonts?.ready.then(fitToOnePage).catch(() => {});
