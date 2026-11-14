@@ -9,6 +9,7 @@
   --resume-font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
   --normal-text-color: #27313b;
   --fit-scale: 1;
+  --photo-width: 25mm;
 }
 
 * {
@@ -63,6 +64,8 @@ textarea {
 }
 
 .resume-content {
+  position: relative;
+  display: flow-root;
   width: calc(100% / var(--fit-scale));
   color: var(--normal-text-color);
   transform: scale(var(--fit-scale));
@@ -80,8 +83,32 @@ textarea {
 }
 
 .resume-header {
+  display: flow-root;
   margin-bottom: 10px;
   text-align: center;
+}
+
+/* 姓名区带证件照：姓名和联系方式在左，照片贴右并垂直居中 */
+.resume-header:has(> .resume-photo) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 14px;
+}
+
+.resume-header:has(> .resume-photo) > :not(.resume-photo) {
+  grid-column: 1;
+}
+
+.resume-header:has(> .resume-photo) > .resume-photo {
+  grid-column: 2;
+}
+
+/* 标题区可以有多行，每一行都能单独设置对齐 */
+.resume-header-text {
+  display: grid;
+  row-gap: 1px;
+  min-width: 0;
 }
 
 .resume-header h1 {
@@ -96,7 +123,21 @@ textarea {
   font-size: var(--base-font-size);
 }
 
+/* 行级对齐：行尾写 {center} / {left} / {right}（也支持中文别名） */
+.resume-page .is-align-center {
+  text-align: center;
+}
+
+.resume-page .is-align-left {
+  text-align: left;
+}
+
+.resume-page .is-align-right {
+  text-align: right;
+}
+
 .section {
+  display: flow-root;
   margin-top: 8px;
 }
 
@@ -173,6 +214,80 @@ textarea {
   font-size: calc(var(--base-font-size) - 0.5px);
   font-weight: 700;
   line-height: 20px;
+}
+
+.resume-page img {
+  display: block;
+  max-width: 100%;
+  max-height: 118mm;
+  height: auto;
+  margin: 4px auto;
+  object-fit: contain;
+  break-inside: avoid;
+}
+
+.resume-image.is-align-right {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.resume-image.is-align-left {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+/* 自由位置：脱离文档流，坐标由 Markdown 里的 at=x,y 决定 */
+.resume-page .resume-image.is-free {
+  position: absolute;
+  margin: 0;
+  max-width: none;
+  z-index: 3;
+}
+
+@media screen {
+  .resume-page img {
+    -webkit-user-drag: none;
+    user-select: none;
+  }
+
+  .resume-page img[data-img-id] {
+    cursor: grab;
+  }
+
+  .resume-page img[data-img-id].is-dragging {
+    cursor: grabbing;
+  }
+
+  .resume-image.is-selected {
+    outline: 1px dashed #1677c8;
+    outline-offset: 2px;
+  }
+}
+
+.resume-image.is-missing {
+  min-width: 120px;
+  min-height: 40px;
+  outline: 1px dashed #d9534f;
+  outline-offset: -1px;
+}
+
+/* 证件照：控制面板单独上传，和 Markdown 里的图片互不影响 */
+.resume-page .resume-photo {
+  display: block;
+  width: var(--photo-width, 25mm);
+  max-width: 45mm;
+  max-height: 50mm;
+  height: auto;
+  margin: 0;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 2px;
+  break-inside: avoid;
+}
+
+/* 没有姓名区时，证件照退化为内容顶部的居中图片 */
+.resume-content > .resume-photo {
+  margin: 0 auto 8px;
 }
 
 .project-separator {
@@ -254,6 +369,81 @@ textarea {
   width: 100%;
 }
 
+.photo-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.image-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.image-list[hidden],
+#imageEditor[hidden] {
+  display: none;
+}
+
+.image-item {
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #cfd6e0;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.image-item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-item.is-active {
+  border-color: #1677c8;
+  box-shadow: 0 0 0 2px rgba(22, 119, 200, 0.25);
+}
+
+.header-line-list {
+  display: grid;
+  gap: 6px;
+}
+
+.header-line-list[hidden] {
+  display: none;
+}
+
+.header-line-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-line-text {
+  overflow: hidden;
+  color: #263241;
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-section .header-line-row select {
+  width: 100%;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid #cfd6e0;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+}
+
 .panel-section select {
   width: 100%;
   height: 34px;
@@ -282,6 +472,11 @@ textarea {
   border: 1px solid #cfd6e0;
   background: #fff;
   color: #27313b;
+}
+
+.wide-button {
+  width: 100%;
+  margin-bottom: 8px;
 }
 
 .file-status {
