@@ -34,6 +34,56 @@
         </section>
 
         <section class="panel-section">
+          <h2>标题区对齐</h2>
+          <p id="headerAlignHint" class="file-status">在「# 姓名」下面写几行，就能逐行选择居中、靠左或靠右。</p>
+          <div id="headerLineList" class="header-line-list" hidden></div>
+        </section>
+
+        <section class="panel-section">
+          <h2>证件照</h2>
+          <div class="photo-actions">
+            <button id="choosePhotoBtn" class="ghost-button" type="button">选择照片</button>
+            <button id="removePhotoBtn" class="ghost-button" type="button">移除</button>
+          </div>
+          <label>
+            <span>照片宽度 <output id="photoWidthValue"></output></span>
+            <input id="photoWidth" type="range" min="18" max="40" step="1" />
+          </label>
+          <p id="photoStatus" class="file-status">未设置证件照。</p>
+          <input id="photoFile" type="file" accept="image/*" hidden />
+        </section>
+
+        <section class="panel-section">
+          <div class="section-title-row">
+            <h2>正文图片</h2>
+            <button id="addImageBtn" class="ghost-button" type="button">插入图片</button>
+          </div>
+          <div id="imageList" class="image-list" hidden></div>
+          <p id="imageHint" class="file-status">选一张本地图片，会插入到 Markdown 光标处。</p>
+          <div id="imageEditor" hidden>
+            <label>
+              <span>图片宽度 <output id="imageWidthValue"></output></span>
+              <input id="imageWidth" type="range" min="2" max="180" step="0.5" value="80" />
+            </label>
+            <label>
+              <span>图片位置</span>
+              <select id="imageAlign">
+                <option value="center">居中</option>
+                <option value="left">靠左</option>
+                <option value="right">靠右</option>
+              </select>
+            </label>
+            <button id="imageFreeBtn" class="ghost-button wide-button" type="button">转为自由位置</button>
+            <div class="photo-actions">
+              <button id="imageMoveUp" class="ghost-button" type="button">上移</button>
+              <button id="imageMoveDown" class="ghost-button" type="button">下移</button>
+              <button id="imageRemove" class="ghost-button" type="button">删除</button>
+            </div>
+          </div>
+          <input id="imageFile" type="file" accept="image/*" hidden />
+        </section>
+
+        <section class="panel-section">
           <h2>文字</h2>
           <label>
             <span>字体</span>
